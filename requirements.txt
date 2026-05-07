@@ -1,0 +1,240 @@
+import cv2
+import numpy as np
+
+# -------------------------
+# Config
+# -------------------------
+categories = ["Plastic", "Burnable", "Cans", "Bottles", "Others"]
+lid_angles = [0, 45, 90, 135, 180]  # degrees
+colors = [
+    (255, 0, 0),  # Blue for Plastic
+    (0, 165, 255),  # Orange for Burnable
+    (192, 192, 192),  # Silver for Cans
+    (0, 255, 0),  # Green for Bottles
+    (128, 128, 128),  # Gray for Others
+]  # BGR for OpenCV
+
+lid_angle = 180  # start pointing to "Others"
+
+
+# -------------------------
+# Function to draw dustbin with enhanced visuals
+# -------------------------
+def draw_dustbin(frame, lid_angle, category):
+    h, w, _ = frame.shape
+    cx, cy = int(w * 0.8), int(h * 0.5)  # dustbin position
+    bin_width, bin_height = 100, 140
+
+    # Draw bin rectangle with shadow effect
+    shadow_offset = 3
+    cv2.rectangle(
+        frame,
+        (cx - bin_width // 2 + shadow_offset, cy + shadow_offset),
+        (cx + bin_width // 2 + shadow_offset, cy + bin_height + shadow_offset),
+        (30, 30, 30),  # Shadow
+        -1,
+    )
+
+    # Draw main bin rectangle
+    cv2.rectangle(
+        frame,
+        (cx - bin_width // 2, cy),
+        (cx + bin_width // 2, cy + bin_height),
+        (70, 70, 70),  # Main bin color
+        -1,
+    )
+
+    # Draw bin border
+    cv2.rectangle(
+        frame,
+        (cx - bin_width // 2, cy),
+        (cx + bin_width // 2, cy + bin_height),
+        (200, 200, 200),  # Border color
+        2,
+    )
+
+    # Draw lid line (thicker and more visible)
+    rad = np.radians(lid_angle)
+    lid_length = 70
+    x2 = int(cx + lid_length * np.cos(rad))
+    y2 = int(cy - lid_length * np.sin(rad))
+    color = colors[categories.index(category)]
+
+    # Draw lid with gradient effect
+    cv2.line(frame, (cx, cy), (x2, y2), color, 8)
+    cv2.circle(frame, (cx, cy), 5, color, -1)  # Pivot point
+    cv2.circle(frame, (x2, y2), 8, color, -1)  # Lid end
+
+    # Draw category text with background
+    text = category
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.8
+    thickness = 2
+    text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+
+    # Background rectangle for text
+    text_x = cx - text_size[0] // 2
+    text_y = cy + bin_height + 40
+    cv2.rectangle(
+        frame,
+        (text_x - 5, text_y - text_size[1] - 5),
+        (text_x + text_size[0] + 5, text_y + 5),
+        (0, 0, 0),  # Black background
+        -1,
+    )
+
+    # Category text
+    cv2.putText(
+        frame,
+        text,
+        (text_x, text_y),
+        font,
+        font_scale,
+        color,
+        thickness,
+    )
+
+
+def draw_instructions(frame):
+    """Draw instructions on the frame"""
+    instructions = [
+        "Smart Dustbin Prototype",
+        "Press keys to simulate trash detection:",
+        "1 - Plastic  2 - Burnable  3 - Cans",
+        "4 - Bottles  5 - Others",
+        "Q - Quit",
+    ]
+
+    y_start = 30
+    for i, instruction in enumerate(instructions):
+        font_scale = 0.7 if i == 0 else 0.5
+        thickness = 2 if i == 0 else 1
+        color = (
+            (0, 255, 255) if i == 0 else (255, 255, 255)
+        )  # Yellow for title, white for others
+
+        cv2.putText(
+            frame,
+            instruction,
+            (10, y_start + i * 25),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_scale,
+            color,
+            thickness,
+        )
+
+
+def draw_category_legend(frame):
+    """Draw category legend with colors"""
+    h, w, _ = frame.shape
+    legend_x = 10
+    legend_y = h - 150
+
+    cv2.putText(
+        frame,
+        "Categories:",
+        (legend_x, legend_y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.6,
+        (255, 255, 255),
+        1,
+    )
+
+    for i, (category, color) in enumerate(zip(categories, colors)):
+        y_pos = legend_y + 25 + i * 20
+        # Draw colored circle
+        cv2.circle(frame, (legend_x + 10, y_pos - 5), 6, color, -1)
+        # Draw category name
+        cv2.putText(
+            frame,
+            f"{i+1}. {category}",
+            (legend_x + 25, y_pos),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
+
+
+# -------------------------
+# Main execution
+# -------------------------
+def main():
+    # Open camera
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Cannot open camera")
+        print("Make sure your camera is not being used by another application")
+        return
+
+    current_category = "Others"
+    print("=" * 50)
+    print("Smart Dustbin Prototype Started!")
+    print("=" * 50)
+    print("Make sure the OpenCV window is in focus (click on it)")
+    print("Press 1-5 to simulate trash detection:")
+    print("  1 - Plastic")
+    print("  2 - Burnable")
+    print("  3 - Cans")
+    print("  4 - Bottles")
+    print("  5 - Others")
+    print("Press 'Q' to quit")
+    print("=" * 50)
+
+    # Set camera properties for better performance
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Failed to grab frame")
+            break
+
+        # Flip for mirror view
+        frame = cv2.flip(frame, 1)
+
+        # Draw all components
+        draw_instructions(frame)
+        draw_category_legend(frame)
+        draw_dustbin(
+            frame, lid_angles[categories.index(current_category)], current_category
+        )
+
+        # Add current status
+        status_text = f"Current: {current_category}"
+        cv2.putText(
+            frame,
+            status_text,
+            (frame.shape[1] - 200, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            colors[categories.index(current_category)],
+            2,
+        )
+
+        # Show frame
+        cv2.imshow("Smart Dustbin Prototype", frame)
+
+        # Handle key input with proper timing
+        key = cv2.waitKey(30) & 0xFF  # Increased wait time
+
+        if key == ord("q") or key == ord("Q"):
+            print("Quitting...")
+            break
+        elif key >= ord("1") and key <= ord("5"):
+            index = key - ord("1")
+            current_category = categories[index]
+            print(f"Lid moved to: {current_category}")
+        elif key != 255:  # 255 means no key pressed
+            print(f"Unknown key pressed. Use 1-5 or Q to quit.")
+
+    # Cleanup
+    cap.release()
+    cv2.destroyAllWindows()
+    print("Smart Dustbin Prototype stopped.")
+
+
+if __name__ == "__main__":
+    main()
