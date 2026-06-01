@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .DS_Store
 dashboard/data/events.csv
+yolov8n.pt
+yolov8s.pt
